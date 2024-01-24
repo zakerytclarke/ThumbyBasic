@@ -1,17 +1,66 @@
 import time
+import os
+
+PATH = "./"
 
 def refresh_display():
     print("THUMBY BASIC")
 
+def input_select(options):
+    return input("Filename:")
+
+def find_basic_files(path):
+    return []
+
+
 try: # Running on Thumby
     import thumby
 
+    PATH = "./Games/ThumbyBasic"
     thumby.display.setFont("/lib/font5x7.bin", 5, 7, 1)
 
     print_values = ["THUMBY BASIC","LOADING...","",""]
     INPUT_STRING = "9876543210 ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()-_=+[]{}|;:'\",.<>?/\\"
 
     input_values = [10]
+
+    def find_basic_files(path):
+        output = []
+        try:
+            for x in os.listdir(path):
+                if ".bas" in x:
+                    output.append(x.split("/")[-1])
+        except:
+            print("ERR Loading Program")
+            
+        return output
+    def input_select(options):
+        input_cursor = 0
+        def update():
+            print("THUMBY BASIC")
+            print("SELECT PRGM")
+            print(options[input_cursor])
+            print(" <--------> ")
+            
+        update()
+        while not thumby.buttonA.pressed():
+            if thumby.buttonL.pressed():
+                if input_cursor > 0:
+                    input_cursor -= 1
+                else:
+                    input_cursor = len(options) - 1  # Loop to the last element
+                update()
+            if thumby.buttonR.pressed():
+                if input_cursor < len(options) - 1:
+                    input_cursor += 1
+                else:
+                    input_cursor = 0  # Loop to the first element
+                update()
+                                
+            refresh_display()
+            time.sleep(0.2)
+                    
+        return options[input_cursor]
 
     def refresh_display():
         thumby.display.fill(0)
@@ -55,6 +104,8 @@ try: # Running on Thumby
         input_values = [10]
         return input_txt
         
+
+
         
 except:
     pass # Running on computer
@@ -484,7 +535,16 @@ def evaluate(node, state):
 
 
 def run_prgm(prgm_txt):
-    parsed = {key: value for d in list(map(parse_statement, prgm_txt.split("\n"))) for key, value in d.items()}
+    print("THUMBY BASIC")
+    print("LOADING...")
+    print("")
+    print("")
+    refresh_display()
+    
+    parsed = {key: value for d in list(map(parse_statement, prgm_txt.strip().split("\n"))) for key, value in d.items()}
+    
+    print("")
+    print("")
     
     line_numbers = list(map(str, sorted(list(map(int, parsed.keys())))))
 
@@ -514,29 +574,20 @@ def run_prgm(prgm_txt):
 
 refresh_display()
 
-prgm_path = "./Games/ThumbyBasic/factorial.bas"
-prgm_path = "./wumpus.bas"
 
-def find_basic_files(path):
-    if ".bas" in path:
-        return path
-    else:
-        output = []
-        for x in os.listdir(path):
-            try:
-                output.append(find_basic_files(path+"/"+x))
-            except:
-                pass
-        return output
-        
 
-try:
-    # import os
-    # print(find_basic_files("."))
+    
+
+
+try: # Program Selector
+    prgm_path = PATH + "/" + input_select(find_basic_files(PATH))
     prgm_txt = open(prgm_path, "r").read()
-    # print(prgm_txt)
-    run_prgm(prgm_txt)
-
+    try:
+        run_prgm(prgm_txt)
+    except Exception as e:
+        print(f"ERR:{e}")
+    
+        
 except Exception as e:
     print(e)
     print("File does not exist")
@@ -544,3 +595,5 @@ except Exception as e:
 
 input("DONE")
 time.sleep(1)
+
+
