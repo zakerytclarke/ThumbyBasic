@@ -1,7 +1,8 @@
 import time
 import os
+import gc 
 
-PATH = "./"
+PATH = "."
 
 def refresh_display():
     print("THUMBY BASIC")
@@ -12,14 +13,15 @@ def input_select(options):
 def find_basic_files(path):
     return []
 
-
+print_values = ["THUMBY BASIC","LOADING...","",""]
+        
 try: # Running on Thumby
     import thumby
 
     PATH = "./Games/ThumbyBasic"
     thumby.display.setFont("/lib/font5x7.bin", 5, 7, 1)
 
-    print_values = ["THUMBY BASIC","LOADING...","",""]
+    
     INPUT_STRING = "9876543210 ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()-_=+[]{}|;:'\",.<>?/\\"
 
     input_values = [10]
@@ -102,6 +104,7 @@ try: # Running on Thumby
         
         input_txt = "".join(map(lambda x:INPUT_STRING[x], input_values))
         input_values = [10]
+        time.sleep(0.5)
         return input_txt
         
 
@@ -116,8 +119,14 @@ class Terminal:
         self.token = token
 
 def unwrap_singleton_list(input_list):
+
     while isinstance(input_list, list) and len(input_list) == 1:
         input_list = input_list[0]
+
+    if isinstance(input_list, list):
+        return input_list    
+    if isinstance(input_list, float):
+        return input_list
     if(len(input_list)) > 1:
         return input_list
     else:
@@ -130,6 +139,7 @@ class NonTerminal:
         self.parse_fn = parse_fn
 
 def infixoperation(tokens):
+
     if(len(tokens)==3 and isinstance(tokens[1], str)):
         return {
             "op":tokens[1].strip(),
@@ -158,12 +168,12 @@ def statementoperation(tokens):
     if tokens[0] == "GOTO ":
         return {
         "action":tokens[0].strip(),
-            "args": tokens[1][0]
+            "args": str(tokens[1])
         }
     if tokens[0] == "PRINT ":
         return {
         "action":tokens[0].strip(),
-            "args": list(map(lambda x: unwrap_singleton_list(x)[0] if(isinstance(x, list)) else x ,tokens[1:][0]))
+            "args": [unwrap_singleton_list(tokens[1])]
         }
     
     return {
@@ -216,11 +226,33 @@ def parse_terminals_many(allowed_characters):
         return ([parsed_characters], input_str)
     return inner
 
+
+def temp_parsed(tokens):
+    # if tokens==[['1']]:
+    #     breakpoint()
+  
+    if len(tokens)==1:
+        return float(tokens[0])
+    else:
+        return float("".join(map(str,tokens)))
+    return (lambda tokens: float(unwrap_singleton_list(tokens)) if len(tokens)==1 else ["".join(list(map(lambda x:x[0], tokens)))])(tokens)
+
 def temp_parser(tokens):
-    # breakpoint()
-    if len(tokens)==3:
-        return [unwrap_singleton_list(tokens[0][0]), unwrap_singleton_list(tokens[2][0])]
-    return [unwrap_singleton_list(tokens)]
+    return int(tokens[0])
+
+    
+
+def temp_fn_parser(tokens):
+    if len(tokens)>1:
+        return {
+            "op":tokens[0].strip(),
+            "args":[
+                unwrap_singleton_list(tokens[2])
+            ]
+        }
+        
+    
+    return unwrap_singleton_list(tokens)
 
 GRAMMAR = {
     "LETTER": NonTerminal([
@@ -290,26 +322,46 @@ GRAMMAR = {
         [Terminal("9")],
     ]),
 
-    "VARIABLE": NonTerminal([
+    "SUBVARIABLE": NonTerminal([
         ["LETTER", "VARIABLE"],
         ["LETTER"],
     ], fn=(lambda tokens: tokens[0] if len(tokens)==1 else ["".join(list(map(lambda x:x[0], tokens)))]), parse_fn=parse_terminals_many(["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"])),
+    
+    "VARIABLE": NonTerminal([
+        ["SUBVARIABLE"]
+    ], fn=lambda tokens:dict({"type":"variable", "value":tokens[0]})),
+
+
+    "SUBSTRING": NonTerminal([
+        ["LETTER", "SUBSTRING"],
+        ["LETTER"],
+    ], fn=(lambda tokens: ["".join(tokens)]), parse_fn=parse_terminals_many(["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","0","1","2","3","4","5","6","7","8","9"," "])),
+    
+    "STRING": NonTerminal([
+        [Terminal('"'), Terminal('"')],
+        [Terminal('"'), "SUBSTRING", Terminal('"')],
+    # ],(lambda x: unwrap_singleton_list(x[1]))),
+    ],(lambda tokens: [unwrap_singleton_list(dict({"type":"string", "value":tokens[1][0]}))])),
+    
+    
+    
     "INTEGER": NonTerminal([
         ["DIGIT", "INTEGER"],
         ["DIGIT"],
-    ], fn=(lambda tokens: tokens[0] if len(tokens)==1 else ["".join(list(map(lambda x:x[0], tokens)))]), parse_fn=parse_terminals_many(["0","1","2","3","4","5","6","7","8","9"])),
+    ], fn=temp_parser, parse_fn=parse_terminals_many(["0","1","2","3","4","5","6","7","8","9"])),
     "FLOAT": NonTerminal([
         ["INTEGER", Terminal(".") ,"INTEGER"],
         ["INTEGER"],
-    ], (lambda tokens: tokens[0] if len(tokens)==1 else ["".join(list(map(lambda x:x[0], tokens)))])),
+    ], temp_parsed),
     "BOOLEAN": NonTerminal([
         [Terminal("TRUE")],
         [Terminal("FALSE")],
     ]),
 
     'CONSTANT': NonTerminal([
+        ["VARIABLE"],
+        ["STRING"],
         ["FLOAT"],
-        ["VARIABLE"]
     ]),
 
 
@@ -330,8 +382,8 @@ GRAMMAR = {
     "FUNCTION": NonTerminal([
         ["FUNC_NAME", Terminal("("), "EXPRESSION", Terminal(")")],
         [Terminal("("), "EXPRESSION", Terminal(")")],
-        ["CONSTANT"]
-    ]),    
+        ["CONSTANT"],
+    ], temp_fn_parser),    
     "FACTOR": NonTerminal([
         ["FUNCTION", Terminal("^"), "FACTOR"],
         ["FUNCTION"],
@@ -381,12 +433,12 @@ GRAMMAR = {
     "INPUTSTATEMENT": NonTerminal([
         [Terminal("INPUT "), "VARIABLE"],
     ], statementoperation),
-    "PRINTEXPRESSION": NonTerminal([
-        ["EXPRESSION", Terminal(", "), "PRINTEXPRESSION"], # Allows print multiple comma separateed expression
-        ["EXPRESSION"]
-    ], temp_parser),
+    # "PRINTEXPRESSION": NonTerminal([
+    #     ["EXPRESSION", Terminal(", "), "PRINTEXPRESSION"], # Allows print multiple comma separateed expression
+    #     ["EXPRESSION"]
+    # ], temp_parser),
     "PRINTSTATEMENT": NonTerminal([
-        [Terminal("PRINT "), "PRINTEXPRESSION"],
+        [Terminal("PRINT "), "EXPRESSION"],
     ], statementoperation),
     "IFSTATEMENT": NonTerminal([
         [Terminal("IF "), "BOOLEXPRESSION", Terminal(" THEN "), "ASSIGNMENT", Terminal(" ELSE "), "ASSIGNMENT"],
@@ -400,15 +452,15 @@ GRAMMAR = {
         [Terminal("END")],
     ], statementoperation),
     "STATEMENT": NonTerminal([
+        ["IFSTATEMENT"],
         ["CLSSTATEMENT"],
         ["ENDSTATEMENT"],
         ["PRINTSTATEMENT"],
         ["INPUTSTATEMENT"],
-        ["IFSTATEMENT"],
     ]),
     "LINESTATEMENT": NonTerminal([
         ["INTEGER", Terminal(" "), "STATEMENT"],
-    ], lambda tokens: dict({tokens[0][0]:tokens[2]})),
+    ], (lambda tokens: dict({str(tokens[0]):tokens[2]}))),
     
 }
 
@@ -416,6 +468,7 @@ GRAMMAR = {
 def parse(input_str, rule, depth=0):
     def parse_terminal(input_str, token):
         if input_str.startswith(token):
+            
             return (token, input_str[len(token):])
         else:
             return None
@@ -443,10 +496,16 @@ def parse(input_str, rule, depth=0):
                 if len(output) == len(ruleset):
                     return (rule.fn(output), remaining_input)
         else:
-            return rule.parse_fn(input_str)
+            
+            result = rule.parse_fn(input_str)
+            if result is None:
+                return None
+            return (rule.fn(result[0]), result[1])
 
     elif isinstance(rule, str):
+        # print([" "]*depth,rule)
         return parse(input_str, GRAMMAR[rule])
+
 
 def parse_statement(statement):
     result = parse(statement, GRAMMAR["LINESTATEMENT"])
@@ -465,52 +524,57 @@ def parse_statement(statement):
         
 
 
-
 def parse_numbers_variables(x, state):
-    try: # Identifier is a number
-        return float(x)
-    except ValueError: # Variable
-        if x in state['variables']:
-            return state['variables'][x]
-        else: # String
-            return x
-            print(f"ERR: Var {x} not defined")
-            raise BaseException(f"Variable {x} not defined")
+    if isinstance(x,dict): 
+        # breakpoint()
+        if x.get('type')=="variable":
+            if x.get('value') in state['variables']:
+                return state['variables'][x.get('value')]
+            else: # Not found
+                print(f"ERR: Var {x.get('value')} not defined")
+                raise BaseException(f"Variable {x.get('value')} not defined")
+        else: # String   
+            return x["value"]
+    if isinstance(x, float) or isinstance(x, int): # Number
+        return x
+    
 
 
 def evaluate(node, state):
+    if isinstance(node, float):
+        return node
     if isinstance(node, str):
+        return parse_numbers_variables(node, state)
+    if isinstance(node, dict) and node.get("type","")!="":
         return parse_numbers_variables(node, state)
     if "action" in node:
         if node["action"] == "CLS":
             pass
         if node["action"] == "END":
             pass
-        if node["action"] == "INT":
-            pass
-        if node["action"] == "STR":
-            pass
         if node["action"] == "PRINT":
-            print("".join(list(map(lambda x:str(evaluate(x,state)), node["args"]))))
+            print(str(evaluate(node["args"][0],state)))
         if node["action"] == "INPUT":
             result = input()
-            try: # Valid integer
-                result = float(result)
-            except ValueError: # String
-                pass
+            # result = {'type':'string', 'value': input()}
+            # try: # Valid integer
+            #     # result = float(result)
+            # except ValueError: # String
+            #     pass
 
-            state["variables"][node["args"][0]] = result
+            
+            state["variables"][node["args"][0].get('value')] = result
             
         if node["action"] == "=": # Assignment
-            state["variables"][node["args"][0]] = parse_numbers_variables(evaluate(node["args"][1], state), state)
+            state["variables"][node["args"][0].get('value')] = evaluate(node["args"][1], state)
         if node["action"] == "GOTO":
             state["line_number"] = node["args"]
     
     if "op" in node:
         if node["op"] == "=":
-            return parse_numbers_variables(evaluate(node["args"][0], state), state) == parse_numbers_variables(evaluate(node["args"][1], state), state)
+            return str(evaluate(node["args"][0], state)) == str(evaluate(node["args"][1], state))
         if node["op"] == "+":
-            return parse_numbers_variables(evaluate(node["args"][0], state), state) + parse_numbers_variables(evaluate(node["args"][1], state), state)
+            return evaluate(node["args"][0], state) + evaluate(node["args"][1], state)
         if node["op"] == "-":
             return parse_numbers_variables(evaluate(node["args"][0], state), state) - parse_numbers_variables(evaluate(node["args"][1], state), state)
         if node["op"] == "*":
@@ -531,6 +595,11 @@ def evaluate(node, state):
                 if len(node["args"]) != 2: # Else statement included
                     return evaluate(node["args"][2], state)
             
+        if node["op"] == "STR":
+            return str(parse_numbers_variables(evaluate(node["args"][0], state), state))
+        if node["op"] == "INT":
+            return int(evaluate(node["args"][0], state))
+            
     return state
 
 
@@ -541,8 +610,19 @@ def run_prgm(prgm_txt):
     print("")
     refresh_display()
     
-    parsed = {key: value for d in list(map(parse_statement, prgm_txt.strip().split("\n"))) for key, value in d.items()}
-    
+    parsed = {}
+    prgm_lines = prgm_txt.strip().split("\n")
+    for i in range(0, len(prgm_lines)):
+        line = prgm_lines[i]
+        d = parse_statement(line)
+        for key, value in d.items():
+            parsed[key] = value
+        gc.collect()
+        print_values[2] = f"{round(i/len(prgm_lines)*100)}%"
+        refresh_display()
+        
+    # parsed = {key: value for d in list(map(parse_statement, prgm_txt.strip().split("\n"))) for key, value in d.items()}
+    print("")
     print("")
     print("")
     
@@ -553,8 +633,6 @@ def run_prgm(prgm_txt):
     # Fetch Current Statement
     while(1):
         current_line_number = state["line_number"]
-
-        
         if current_line_number in parsed:
             current_statement = parsed[current_line_number]
         else:
@@ -573,10 +651,6 @@ def run_prgm(prgm_txt):
 
 
 refresh_display()
-
-
-
-    
 
 
 try: # Program Selector
