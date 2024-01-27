@@ -37,13 +37,15 @@ try: # Running on Thumby
             
         return output
     def input_select(options):
+        print("THUMBY BASIC")
+        print("SELECT PRGM")
+        print("")
+        print(" <--------> ")
         input_cursor = 0
         def update():
-            print("THUMBY BASIC")
-            print("SELECT PRGM")
-            print(options[input_cursor])
-            print(" <--------> ")
-            
+            print_values[2] = options[input_cursor]
+            refresh_display()
+        
         update()
         while not thumby.buttonA.pressed():
             if thumby.buttonL.pressed():
@@ -60,7 +62,7 @@ try: # Running on Thumby
                 update()
                                 
             refresh_display()
-            time.sleep(0.2)
+            time.sleep(0.1)
                     
         return options[input_cursor]
 
@@ -100,7 +102,7 @@ try: # Running on Thumby
                     input_values.append(10)
                     input_cursor += 1
             refresh_display()
-            time.sleep(0.2)
+            time.sleep(0.1)
         
         input_txt = "".join(map(lambda x:INPUT_STRING[x], input_values))
         input_values = [10]
@@ -602,6 +604,12 @@ def evaluate(node, state):
             
     return state
 
+DEFAULT_PRGM="""0 PRINT "HELLO WORLD"
+10 PRINT "NAME"
+20 INPUT N
+30 PRINT "HI"
+40 PRINT N"""
+
 
 def run_prgm(prgm_txt):
     print("THUMBY BASIC")
@@ -654,8 +662,14 @@ refresh_display()
 
 
 try: # Program Selector
-    prgm_path = PATH + "/" + input_select(find_basic_files(PATH))
-    prgm_txt = open(prgm_path, "r").read()
+    basic_files = find_basic_files(PATH)
+    if len(basic_files)==0:
+        basic_files = ["hello.bas"]
+        input_select(basic_files)
+        prgm_txt = DEFAULT_PRGM
+    else:
+        prgm_path = PATH + "/" + input_select(basic_files)
+        prgm_txt = open(prgm_path, "r").read()
     try:
         run_prgm(prgm_txt)
     except Exception as e:
